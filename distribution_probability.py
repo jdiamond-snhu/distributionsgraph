@@ -159,17 +159,7 @@ if tickers:
                 
             except Exception as e:
                 st.error(f"Error processing {ticker}: {e}")
- # --- SIDEBAR DISPLAY LAYOUT ---
-    st.sidebar.header("Selected Company Profiles")
-    
-    # Sort the dictionary items alphabetically by the formal company name (the value field)
-    sorted_profiles = sorted(company_names_dict.items(), key=lambda x: x[1].lower())
-    
-    for symbol, full_name in sorted_profiles:
-        st.sidebar.markdown(f"**{symbol}**: {full_name}")
-        
-    st.sidebar.markdown("---")
-    st.sidebar.info(f"Current risk-free benchmark yield used for Sharpe calculation: {rf_rate:.2%}")
+
     # Render plots in a 2x2 grid structure
     if plots:
         for i in range(0, len(plots), 2):
