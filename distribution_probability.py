@@ -2,7 +2,6 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import plotly.express as px
 import plotly.graph_objects as go
 
 # Force the Streamlit page layout to use the full screen width
@@ -73,37 +72,41 @@ if tickers:
                 # Smooth the data using a rolling average for an elegant curve shape
                 curve_df['Probability Density'] = curve_df['Probability Density'].rolling(window=3, center=True, min_periods=1).mean()
 
-                # Generate the base line chart for the distribution
-                fig = px.line(
-                    curve_df, 
-                    x="Annual Return",
-                    y="Probability Density",
-                    title=f"{ticker} Annual Return Distribution (5yr)",
-                    labels={"Annual Return": "Annual Return (Log Scale)", "Probability Density": "Density"},
-                    template="plotly_white",
-                    color_discrete_sequence=["#4A90E2"] 
-                )
-                
-                # Make the outer line smooth (spline)
-                fig.update_traces(line_shape="spline", line_width=2.5)
-
-                # Filter curve data points that fall strictly between -1 SD and +1 SD for shading
+                # Filter curve data points that fall strictly between -1 SD and +1 SD for inner shading
                 sd_zone_df = curve_df[(curve_df['Annual Return'] >= minus_1_sd) & (curve_df['Annual Return'] <= plus_1_sd)]
 
-                # 1. Fill the target Standard Deviation range with a deeper translucent blue shade
+                # Build chart blank canvas
+                fig = go.Figure()
+
+                # 1. Outer Shaded Area (The entire return distribution profile - very light translucent blue)
+                fig.add_trace(
+                    go.Scatter(
+                        x=curve_df['Annual Return'],
+                        y=curve_df['Probability Density'],
+                        fill='tozeroy',
+                        fillcolor="rgba(173, 216, 230, 0.3)", # Ultra soft light blue background fill
+                        mode='none',                         # Hides the outer border line entirely
+                        line=dict(shape='spline'),           # Smooths the underlying shape geometry
+                        hoverinfo='skip',
+                        showlegend=False
+                    )
+                )
+
+                # 2. Inner Shaded Area (The core Standard Deviation range - deeper translucent blue)
                 fig.add_trace(
                     go.Scatter(
                         x=sd_zone_df['Annual Return'],
                         y=sd_zone_df['Probability Density'],
                         fill='tozeroy',
-                        fillcolor="rgba(74, 144, 226, 0.4)", 
-                        mode='none',
+                        fillcolor="rgba(74, 144, 226, 0.45)", # Darker translucent blue for emphasis
+                        mode='none',                          # Hides the inner line boundaries
+                        line=dict(shape='spline'),
                         hoverinfo='skip',
                         showlegend=False
                     )
                 )
                 
-                # 2. Add vertical drop lines down to the X-axis with clean top text markers
+                # 3. Add vertical drop lines down to the X-axis with clean top text markers
                 # Mean Line (Black Dotted)
                 fig.add_vline(
                     x=mean_return, 
@@ -135,8 +138,11 @@ if tickers:
                     annotation_font=dict(color="gray", size=10)
                 )
                 
-                # 3. Apply light gray background styling to the graph plot and grid canvas
+                # Apply layout, axis, title and light gray background styling
                 fig.update_layout(
+                    title=f"{ticker} Annual Return Distribution (5yr)",
+                    xaxis_title="Annual Return (Log Scale)",
+                    yaxis_title="Density",
                     showlegend=False,
                     plot_bgcolor="#F4F4F6",  
                     paper_bgcolor="#FFFFFF", 
