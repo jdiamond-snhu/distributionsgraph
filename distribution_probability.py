@@ -19,11 +19,21 @@ if len(tickers) > 4:
     st.error("Please enter a maximum of 4 tickers.")
     st.stop()
 
-# Cache function to fetch data for a single stock ticker
+# Optimized cache function to fetch data AND company metadata simultaneously
 @st.cache_data
-def load_single_ticker_data(ticker):
+def load_ticker_metadata_and_data(ticker):
+    # Initialize the Ticker object to extract profile data
+    ticker_obj = yf.Ticker(ticker)
+    
+    # Safely pull the formal business entity or fund name
+    try:
+        company_name = ticker_obj.info.get('longName', ticker)
+    except Exception:
+        company_name = ticker  # Fallback to raw symbol if API blocks metadata request
+        
+    # Download 5 years of pricing information
     data = yf.download(ticker, period="5y", progress=False)
-    return data
+    return company_name, data
 
 # Dynamic risk-free rate fetching function using the 13-week T-Bill yield (^IRX)
 @st.cache_data
@@ -39,14 +49,16 @@ def get_risk_free_rate():
 
 if tickers:
     plots = []
+    company_names_dict = {}  # Key-value storage for the sidebar mapping
     
     with st.spinner("Fetching data and analyzing distributions..."):
         rf_rate = get_risk_free_rate()
         
         for ticker in tickers:
             try:
-                # Safely pull isolated DataFrame for the specific stock
-                df = load_single_ticker_data(ticker)
+                # Fetch combined information via cached execution pipeline
+                company_name, df = load_ticker_metadata_and_data(ticker)
+                company_names_dict[ticker] = company_name
                 
                 if df is None or len(df) == 0:
                     st.warning(f"No data found for {ticker}")
@@ -160,6 +172,18 @@ if tickers:
             except Exception as e:
                 st.error(f"Error processing {ticker}: {e}")
 
+    # --- SIDEBAR DISPLAY LAYOUT ---
+    st.sidebar.header("Selected Company Profiles")
+    
+    # Sort the dictionary items alphabetically by the formal company name (the value)
+    sorted_profiles = sorted(company_names_dict.items(), key=lambda x: x[1].lower())
+    
+    for symbol, full_name in sorted_profiles:
+        st.sidebar.markdown(f"**{symbol}**: {full_name}")
+        
+    st.sidebar.markdown("---")
+    st.sidebar.info(f"Current risk-free benchmark yield used for Sharpe calculation: {rf_rate:.2%}")
+
     # Render plots in a 2x2 grid structure
     if plots:
         for i in range(0, len(plots), 2):
@@ -171,6 +195,3 @@ if tickers:
             if i + 1 < len(plots):
                 with col2:
                     st.plotly_chart(plots[i+1], use_container_width=True)
-
-st.sidebar.header("About")
-st.sidebar.info(f"Current risk-free benchmark yield used for Sharpe calculation: {rf_rate:.2%}")
