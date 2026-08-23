@@ -9,10 +9,10 @@ st.set_page_config(layout="wide")
 
 # App Title & Subtitle
 st.title("Stock Return Probability Distribution")
-st.write("Enter up to 4 stock tickers and press **Enter** to visualize their annual return distributions and Sharpe Ratios.")
+st.write("Enter up to 4 stock tickers and press **Enter** to visualize their expected annual return distributions.")
 
 # User Input
-tickers_input = st.text_input("Enter Tickers (separated by commas)", "F, AAPL, MSFT, GOOG")
+tickers_input = st.text_input("Enter Tickers (separated by commas)", "MCD, AAPL, MSFT, GOOG")
 tickers = [t.strip().upper() for t in tickers_input.split(',') if t.strip()]
 
 if len(tickers) > 4:
@@ -29,22 +29,18 @@ def load_single_ticker_data(ticker):
 @st.cache_data
 def get_risk_free_rate():
     try:
-        # Fetch the most recent 13-week Treasury Bill ticker yield
         t_bill = yf.download("^IRX", period="5d", progress=False)
         if not t_bill.empty:
-            # ^IRX is returned as a percentage (e.g., 4.5 means 4.5%). Divide by 100 to get decimal form.
             latest_rate = t_bill['Close'].squeeze().iloc[-1] / 100
             return latest_rate
     except Exception:
         pass
-    # Safe default fallback (e.g., historical average 4.0%) if fetching fails
-    return 0.040
+    return 0.040 # Safe 4% fallback if fetching fails
 
 if tickers:
     plots = []
     
     with st.spinner("Fetching data and analyzing distributions..."):
-        # Acquire real-time benchmark risk-free rate
         rf_rate = get_risk_free_rate()
         
         for ticker in tickers:
@@ -52,53 +48,48 @@ if tickers:
                 # Safely pull isolated DataFrame for the specific stock
                 df = load_single_ticker_data(ticker)
                 
-                # Check if DataFrame has rows natively
                 if df is None or len(df) == 0:
                     st.warning(f"No data found for {ticker}")
                     continue
                 
-                # Check for either 'Adj Close' or 'Close' column safely
                 price_col = 'Adj Close' if 'Adj Close' in df.columns else 'Close'
-                
-                # Calculate daily log returns using the single column array
                 prices = df[price_col].squeeze()
-                log_returns = np.log(prices / prices.shift(1))
                 
-                # Annualization scaling factor (approx. 252 trading days)
-                annual_returns = log_returns.dropna() * 252
+                # Calculate daily log returns
+                log_returns = np.log(prices / prices.shift(1)).dropna()
                 
-                if annual_returns.empty:
+                if log_returns.empty:
                     st.warning(f"Not enough return data to plot {ticker}")
                     continue
 
-                # Calculate statistical parameters
-                mean_return = annual_returns.mean()
-                std_dev = annual_returns.std() # Volatility
+                # --- CORRECT MATHEMATICAL ANNUALIZATION SCALE ---
+                daily_mean = log_returns.mean()
+                daily_std = log_returns.std()
+                
+                mean_return = daily_mean * 252                # Mean scales linearly
+                std_dev = daily_std * np.sqrt(252)            # Volatility scales by square root of time
+                
                 minus_1_sd = mean_return - std_dev
                 plus_1_sd = mean_return + std_dev
                 
-                # Calculate Sharpe Ratio: (Mean Return - Risk Free Rate) / Standard Deviation
-                # Prevent DivisionByZero errors if standard deviation is somehow 0
+                # Calculate True Sharpe Ratio
                 if std_dev > 0:
                     sharpe_ratio = (mean_return - rf_rate) / std_dev
                     sharpe_text = f" | Sharpe Ratio: {sharpe_ratio:.2f}"
                 else:
                     sharpe_text = " | Sharpe Ratio: N/A"
                 
-                # Generate smooth frequency curve data natively without scipy
-                counts, bin_edges = np.histogram(annual_returns, bins=50, density=True)
-                bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+                # Generate a clean parametric normal probability curve (No scipy dependency)
+                # Generate 200 clean coordinate points between -3.5 and +3.5 Standard Deviations
+                x_values = np.linspace(mean_return - 3.5 * std_dev, mean_return + 3.5 * std_dev, 200)
+                y_values = (1 / (std_dev * np.sqrt(2 * np.pi))) * np.exp(-0.5 * ((x_values - mean_return) / std_dev) ** 2)
                 
-                # Create a DataFrame of the distribution path
                 curve_df = pd.DataFrame({
-                    'Annual Return': bin_centers,
-                    'Probability Density': counts
+                    'Annual Return': x_values,
+                    'Probability Density': y_values
                 })
-                
-                # Smooth the data using a rolling average for an elegant curve shape
-                curve_df['Probability Density'] = curve_df['Probability Density'].rolling(window=3, center=True, min_periods=1).mean()
 
-                # Filter curve data points that fall strictly between -1 SD and +1 SD for inner shading
+                # Filter curve data points that fall strictly between -1 SD and +1 SD for the core shading
                 sd_zone_df = curve_df[(curve_df['Annual Return'] >= minus_1_sd) & (curve_df['Annual Return'] <= plus_1_sd)]
 
                 # Build chart blank canvas
@@ -139,7 +130,7 @@ if tickers:
                     line_dash="dot", 
                     line_color="black", 
                     line_width=1.5,
-                    annotation_text=f"Mean: {mean_return:.2%}", 
+                    annotation_text=f"Mean: {mean_return:.1%}", 
                     annotation_position="top right",
                     annotation_font=dict(color="black", size=11)
                 )
@@ -149,7 +140,7 @@ if tickers:
                     line_dash="dot", 
                     line_color="gray", 
                     line_width=1,
-                    annotation_text=f"-1 SD: {minus_1_sd:.2%}", 
+                    annotation_text=f"-1 SD: {minus_1_sd:.1%}", 
                     annotation_position="top left",
                     annotation_font=dict(color="gray", size=10)
                 )
@@ -159,21 +150,24 @@ if tickers:
                     line_dash="dot", 
                     line_color="gray", 
                     line_width=1,
-                    annotation_text=f"+1 SD: {plus_1_sd:.2%}", 
+                    annotation_text=f"+1 SD: {plus_1_sd:.1%}", 
                     annotation_position="top right",
                     annotation_font=dict(color="gray", size=10)
                 )
                 
-                # Apply layout, axis, and include the Sharpe Ratio inside the Title block
+                # Apply layout, format the X-axis as percentage scales
                 fig.update_layout(
-                    title=f"{ticker} Annual Return Distribution (5yr){sharpe_text}",
-                    xaxis_title="Annual Return (Log Scale)",
-                    yaxis_title="Density",
+                    title=f"{ticker} Expected Annual Return Profile (5yr Data){sharpe_text}",
+                    xaxis_title="Expected Annual Return (%)",
+                    yaxis_title="Probability Density",
                     showlegend=False,
                     plot_bgcolor="#F4F4F6",  
                     paper_bgcolor="#FFFFFF", 
                     margin=dict(l=20, r=20, t=40, b=20),
-                    xaxis=dict(gridcolor="#FFFFFF"), 
+                    xaxis=dict(
+                        gridcolor="#FFFFFF",
+                        tickformat=".1%" # Displays numbers clean like -10.0%, 0.0%, 10.0%
+                    ), 
                     yaxis=dict(gridcolor="#FFFFFF")
                 )
                 
@@ -195,4 +189,4 @@ if tickers:
                     st.plotly_chart(plots[i+1], use_container_width=True)
 
 st.sidebar.header("About")
-st.sidebar.info(f"This application tracks historical metrics. Current benchmark risk-free rate used for Sharpe calculation: {rf_rate:.2%}")
+st.sidebar.info(f"Current risk-free benchmark yield used for Sharpe calculation: {rf_rate:.2%}")
