@@ -16,47 +16,43 @@ if len(tickers) > 4:
     st.error("Please enter a maximum of 4 tickers.")
     st.stop()
 
-# Data Fetching
+# Isolated data fetch function for a single ticker to prevent multi-index data clash
 @st.cache_data
-def load_data(ticker_list):
-    data = yf.download(ticker_list, period="5y", group_by='ticker')
+def load_single_ticker_data(ticker):
+    data = yf.download(ticker, period="5y", progress=False)
     return data
 
 if tickers:
     plots = []
     
     with st.spinner("Fetching data and analyzing distributions..."):
-        raw_data = load_data(tickers)
-        
         for ticker in tickers:
             try:
-                # Handle single vs multiple ticker structures from yfinance
-                if len(tickers) == 1:
-                    df = raw_data
-                else:
-                    if ticker not in raw_data.columns.levels:
-                        st.warning(f"No data found for {ticker}")
-                        continue
-                    df = raw_data[ticker]
+                # Safely pull isolated DataFrame for the specific stock
+                df = load_single_ticker_data(ticker)
                 
-                if df.empty:
+                # Check if DataFrame has rows natively
+                if df is None or len(df) == 0:
                     st.warning(f"No data found for {ticker}")
                     continue
                 
                 # Check for either 'Adj Close' or 'Close' column safely
                 price_col = 'Adj Close' if 'Adj Close' in df.columns else 'Close'
                 
-                # Calculate daily log returns
-                df['Log Return'] = np.log(df[price_col] / df[price_col].shift(1))
+                # Calculate daily log returns using the single column array
+                # .squeeze() ensures data handles as a flat series if yfinance pads it
+                prices = df[price_col].squeeze()
+                
+                log_returns = np.log(prices / prices.shift(1))
                 
                 # Annualization scaling factor (approx. 252 trading days)
-                annual_returns = df['Log Return'].dropna() * 252
+                annual_returns = log_returns.dropna() * 252
                 
                 if annual_returns.empty:
                     st.warning(f"Not enough return data to plot {ticker}")
                     continue
 
-                # Calculate the exact mean for display
+                # Calculate the exact mean return
                 mean_return = annual_returns.mean()
                 
                 # Create a clean DataFrame for Plotly Express
@@ -64,7 +60,7 @@ if tickers:
                     'Annual Return': annual_returns
                 })
 
-                # Native Plotly histogram (Does NOT require scipy)
+                # Native Plotly histogram (No scipy dependency)
                 fig = px.histogram(
                     plot_df, 
                     x="Annual Return",
@@ -75,7 +71,7 @@ if tickers:
                     opacity=0.7
                 )
                 
-                # Add a vertical line exactly at the mean return
+                # Highlight the calculated mean return as requested
                 fig.add_vline(
                     x=mean_return, 
                     line_dash="dash", 
@@ -94,7 +90,7 @@ if tickers:
             except Exception as e:
                 st.error(f"Error processing {ticker}: {e}")
 
-    # Render all charts
+    # Render all successfully built plots sequentially
     for plot in plots:
         st.plotly_chart(plot, use_container_width=True)
 
