@@ -148,7 +148,9 @@ if tickers:
                     margin=dict(l=20, r=20, t=40, b=20),
                     xaxis=dict(
                         gridcolor="#FFFFFF",
-                        tickformat=".1%" 
+                        tickformat=".1%", 
+                        # Force the chart window to clamp exactly at a maximum total loss of -100% (-1.0)
+                        range=[max(-1.0, mean_return - 3.5 * std_dev), mean_return + 3.5 * std_dev]
                     ), 
                     yaxis=dict(gridcolor="#FFFFFF")
                 )
