@@ -87,16 +87,6 @@ if tickers:
                 # Make the outer line smooth (spline)
                 fig.update_traces(line_shape="spline", line_width=2.5)
 
-                # Helper function to find the closest Y (Density) coordinate on the curve for a given X value
-                def get_curve_y(x_val):
-                    idx = (curve_df['Annual Return'] - x_val).abs().idxmin()
-                    return curve_df.loc[idx, 'Probability Density']
-
-                # Find exact plot intersection coordinates
-                mean_y = get_curve_y(mean_return)
-                minus_sd_y = get_curve_y(minus_1_sd)
-                plus_sd_y = get_curve_y(plus_1_sd)
-
                 # Filter curve data points that fall strictly between -1 SD and +1 SD for shading
                 sd_zone_df = curve_df[(curve_df['Annual Return'] >= minus_1_sd) & (curve_df['Annual Return'] <= plus_1_sd)]
 
@@ -106,40 +96,52 @@ if tickers:
                         x=sd_zone_df['Annual Return'],
                         y=sd_zone_df['Probability Density'],
                         fill='tozeroy',
-                        fillcolor="rgba(74, 144, 226, 0.4)", # Stronger translucent blue for the 1-SD zone
+                        fillcolor="rgba(74, 144, 226, 0.4)", 
                         mode='none',
                         hoverinfo='skip',
                         showlegend=False
                     )
                 )
-
-                # 2. Add a scatter trace layer for the 3 visual highlight dots
-                fig.add_trace(
-                    go.Scatter(
-                        x=[minus_1_sd, mean_return, plus_1_sd],
-                        y=[minus_sd_y, mean_y, plus_sd_y],
-                        mode="markers+text",
-                        marker=dict(color="#1F77B4", size=10, symbol="circle"), 
-                        text=[f"-1 SD: {minus_1_sd:.2%}", f"Mean: {mean_return:.2%}", f"+1 SD: {plus_1_sd:.2%}"],
-                        textposition=["top left", "top center", "top right"],
-                        textfont=dict(color="black", size=11),
-                        hoverinfo="skip",
-                        showlegend=False
-                    )
-                )
                 
-                # Draw vertical drop lines down to the X-axis
-                fig.add_vline(x=mean_return, line_dash="dot", line_color="black", line_width=1.5)
-                fig.add_vline(x=minus_1_sd, line_dash="dot", line_color="gray", line_width=1)
-                fig.add_vline(x=plus_1_sd, line_dash="dot", line_color="gray", line_width=1)
+                # 2. Add vertical drop lines down to the X-axis with clean top text markers
+                # Mean Line (Black Dotted)
+                fig.add_vline(
+                    x=mean_return, 
+                    line_dash="dot", 
+                    line_color="black", 
+                    line_width=1.5,
+                    annotation_text=f"Mean: {mean_return:.2%}", 
+                    annotation_position="top right",
+                    annotation_font=dict(color="black", size=11)
+                )
+                # -1 SD Line (Gray Dotted)
+                fig.add_vline(
+                    x=minus_1_sd, 
+                    line_dash="dot", 
+                    line_color="gray", 
+                    line_width=1,
+                    annotation_text=f"-1 SD: {minus_1_sd:.2%}", 
+                    annotation_position="top left",
+                    annotation_font=dict(color="gray", size=10)
+                )
+                # +1 SD Line (Gray Dotted)
+                fig.add_vline(
+                    x=plus_1_sd, 
+                    line_dash="dot", 
+                    line_color="gray", 
+                    line_width=1,
+                    annotation_text=f"+1 SD: {plus_1_sd:.2%}", 
+                    annotation_position="top right",
+                    annotation_font=dict(color="gray", size=10)
+                )
                 
                 # 3. Apply light gray background styling to the graph plot and grid canvas
                 fig.update_layout(
                     showlegend=False,
-                    plot_bgcolor="#F4F4F6",  # Light gray interior graph background
-                    paper_bgcolor="#FFFFFF", # White background for the outer framing card
+                    plot_bgcolor="#F4F4F6",  
+                    paper_bgcolor="#FFFFFF", 
                     margin=dict(l=20, r=20, t=40, b=20),
-                    xaxis=dict(gridcolor="#FFFFFF"), # Clean crisp white gridlines over the gray canvas
+                    xaxis=dict(gridcolor="#FFFFFF"), 
                     yaxis=dict(gridcolor="#FFFFFF")
                 )
                 
