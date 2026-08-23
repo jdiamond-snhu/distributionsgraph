@@ -89,41 +89,24 @@ if tickers:
                     'Probability Density': y_values
                 })
 
-                # Filter curve data points that fall strictly between -1 SD and +1 SD for the core shading
-                sd_zone_df = curve_df[(curve_df['Annual Return'] >= minus_1_sd) & (curve_df['Annual Return'] <= plus_1_sd)]
-
                 # Build chart blank canvas
                 fig = go.Figure()
 
-                # 1. Outer Shaded Area (Entire distribution profile - ultra soft translucent light blue)
+                # 1. Single Unified Shaded Area (Seamless fill with a single translucent blue color)
                 fig.add_trace(
                     go.Scatter(
                         x=curve_df['Annual Return'],
                         y=curve_df['Probability Density'],
                         fill='tozeroy',
-                        fillcolor="rgba(173, 216, 230, 0.3)", 
-                        mode='none',                         
-                        line=dict(shape='spline'),           
-                        hoverinfo='skip',
-                        showlegend=False
-                    )
-                )
-
-                # 2. Inner Shaded Area (Core Standard Deviation range - deeper translucent blue)
-                fig.add_trace(
-                    go.Scatter(
-                        x=sd_zone_df['Annual Return'],
-                        y=sd_zone_df['Probability Density'],
-                        fill='tozeroy',
-                        fillcolor="rgba(74, 144, 226, 0.45)", 
-                        mode='none',                          
-                        line=dict(shape='spline'),
+                        fillcolor="rgba(74, 144, 226, 0.45)", # Unified medium translucent blue
+                        mode='none',                         # Hides the outer border line entirely
+                        line=dict(shape='spline'),           # Smooths the underlying shape geometry
                         hoverinfo='skip',
                         showlegend=False
                     )
                 )
                 
-                # 3. Add vertical drop lines down to the X-axis with clean top text markers
+                # 2. Add vertical drop lines down to the X-axis with clean top text markers
                 # Mean Line (Black Dotted)
                 fig.add_vline(
                     x=mean_return, 
@@ -134,25 +117,25 @@ if tickers:
                     annotation_position="top right",
                     annotation_font=dict(color="black", size=11)
                 )
-                # -1 SD Line (Gray Dotted)
+                # -1 SD Line (High-Contrast Orange Dotted)
                 fig.add_vline(
                     x=minus_1_sd, 
                     line_dash="dot", 
-                    line_color="gray", 
-                    line_width=1,
+                    line_color="#FF6B00", # Vivid Orange
+                    line_width=1.5,
                     annotation_text=f"-1 SD: {minus_1_sd:.1%}", 
                     annotation_position="top left",
-                    annotation_font=dict(color="gray", size=10)
+                    annotation_font=dict(color="#FF6B00", size=10, bold=True)
                 )
-                # +1 SD Line (Gray Dotted)
+                # +1 SD Line (High-Contrast Orange Dotted)
                 fig.add_vline(
                     x=plus_1_sd, 
                     line_dash="dot", 
-                    line_color="gray", 
-                    line_width=1,
+                    line_color="#FF6B00", # Vivid Orange
+                    line_width=1.5,
                     annotation_text=f"+1 SD: {plus_1_sd:.1%}", 
                     annotation_position="top right",
-                    annotation_font=dict(color="gray", size=10)
+                    annotation_font=dict(color="#FF6B00", size=10, bold=True)
                 )
                 
                 # Apply layout, format the X-axis as percentage scales
