@@ -43,9 +43,7 @@ if tickers:
                 price_col = 'Adj Close' if 'Adj Close' in df.columns else 'Close'
                 
                 # Calculate daily log returns using the single column array
-                # .squeeze() ensures data handles as a flat series if yfinance pads it
                 prices = df[price_col].squeeze()
-                
                 log_returns = np.log(prices / prices.shift(1))
                 
                 # Annualization scaling factor (approx. 252 trading days)
@@ -58,33 +56,50 @@ if tickers:
                 # Calculate the exact mean return
                 mean_return = annual_returns.mean()
                 
-                # Create a clean DataFrame for Plotly Express
-                plot_df = pd.DataFrame({
-                    'Annual Return': annual_returns
+                # 1. Generate smooth frequency curve data natively without scipy
+                counts, bin_edges = np.histogram(annual_returns, bins=50, density=True)
+                bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+                
+                # Create a DataFrame of the distribution path
+                curve_df = pd.DataFrame({
+                    'Annual Return': bin_centers,
+                    'Probability Density': counts
                 })
+                
+                # Smooth the data using a rolling average for an elegant curve shape
+                curve_df['Probability Density'] = curve_df['Probability Density'].rolling(window=3, center=True, min_periods=1).mean()
 
-                # Native Plotly histogram (No scipy dependency)
-                fig = px.histogram(
-                    plot_df, 
+                # 2. Draw an area chart to get a smooth line filled underneath
+                fig = px.area(
+                    curve_df, 
                     x="Annual Return",
-                    nbins=40,
+                    y="Probability Density",
                     title=f"{ticker} Annual Return Distribution (5yr)",
-                    labels={"Annual Return": "Annual Return (Log Scale)"},
+                    labels={"Annual Return": "Annual Return (Log Scale)", "Probability Density": "Density"},
                     template="plotly_white",
-                    opacity=0.7
+                    color_discrete_sequence=["#4A90E2"] # Nice clean blue border line
                 )
                 
-                # Highlight the calculated mean return
+                # Make the line smooth (spline) and fill it with a soft, translucent light blue
+                fig.update_traces(
+                    line_shape="spline",
+                    line_width=2.5,
+                    fill='tozeroy',
+                    fillcolor="rgba(173, 216, 230, 0.4)" # Translucent light blue hex/alpha format
+                )
+                
+                # 3. Add a vertical black dotted line exactly at the mean return
                 fig.add_vline(
                     x=mean_return, 
-                    line_dash="dash", 
-                    line_color="red",
+                    line_dash="dot", 
+                    line_color="black",
+                    line_width=2,
                     annotation_text=f"Mean: {mean_return:.2%}", 
-                    annotation_position="top right"
+                    annotation_position="top right",
+                    annotation_font=dict(color="black", size=12)
                 )
                 
                 fig.update_layout(
-                    yaxis_title="Frequency Count",
                     showlegend=False,
                     margin=dict(l=20, r=20, t=40, b=20) # Tighten margins for grid alignment
                 )
@@ -96,16 +111,12 @@ if tickers:
 
     # Render plots in a 2x2 grid structure
     if plots:
-        # Create a loop that processes 2 elements at a time
         for i in range(0, len(plots), 2):
-            # Create two equal-width columns for this row
             col1, col2 = st.columns(2)
             
-            # Place the first plot in the left column
             with col1:
                 st.plotly_chart(plots[i], use_container_width=True)
                 
-            # Place the second plot in the right column if it exists
             if i + 1 < len(plots):
                 with col2:
                     st.plotly_chart(plots[i+1], use_container_width=True)
