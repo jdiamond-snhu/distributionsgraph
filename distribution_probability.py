@@ -79,8 +79,7 @@ if tickers:
                 else:
                     sharpe_text = " | Sharpe Ratio: N/A"
                 
-                # Generate a clean parametric normal probability curve (No scipy dependency)
-                # Generate 200 clean coordinate points between -3.5 and +3.5 Standard Deviations
+                # Generate a clean parametric normal probability curve
                 x_values = np.linspace(mean_return - 3.5 * std_dev, mean_return + 3.5 * std_dev, 200)
                 y_values = (1 / (std_dev * np.sqrt(2 * np.pi))) * np.exp(-0.5 * ((x_values - mean_return) / std_dev) ** 2)
                 
@@ -106,14 +105,14 @@ if tickers:
                     )
                 )
                 
-                # 2. Add vertical drop lines down to the X-axis with clean top text markers
+                # 2. Add vertical drop lines down to the X-axis with HTML bolding strings
                 # Mean Line (Black Dotted)
                 fig.add_vline(
                     x=mean_return, 
                     line_dash="dot", 
                     line_color="black", 
                     line_width=1.5,
-                    annotation_text=f"Mean: {mean_return:.1%}", 
+                    annotation_text=f"<b>Mean: {mean_return:.1%}</b>", 
                     annotation_position="top right",
                     annotation_font=dict(color="black", size=11)
                 )
@@ -121,21 +120,21 @@ if tickers:
                 fig.add_vline(
                     x=minus_1_sd, 
                     line_dash="dot", 
-                    line_color="#FF6B00", # Vivid Orange
+                    line_color="#FF6B00", 
                     line_width=1.5,
-                    annotation_text=f"-1 SD: {minus_1_sd:.1%}", 
+                    annotation_text=f"<b>-1 SD: {minus_1_sd:.1%}</b>", 
                     annotation_position="top left",
-                    annotation_font=dict(color="#FF6B00", size=10, bold=True)
+                    annotation_font=dict(color="#FF6B00", size=10)
                 )
                 # +1 SD Line (High-Contrast Orange Dotted)
                 fig.add_vline(
                     x=plus_1_sd, 
                     line_dash="dot", 
-                    line_color="#FF6B00", # Vivid Orange
+                    line_color="#FF6B00", 
                     line_width=1.5,
-                    annotation_text=f"+1 SD: {plus_1_sd:.1%}", 
+                    annotation_text=f"<b>+1 SD: {plus_1_sd:.1%}</b>", 
                     annotation_position="top right",
-                    annotation_font=dict(color="#FF6B00", size=10, bold=True)
+                    annotation_font=dict(color="#FF6B00", size=10)
                 )
                 
                 # Apply layout, format the X-axis as percentage scales
@@ -149,7 +148,7 @@ if tickers:
                     margin=dict(l=20, r=20, t=40, b=20),
                     xaxis=dict(
                         gridcolor="#FFFFFF",
-                        tickformat=".1%" # Displays numbers clean like -10.0%, 0.0%, 10.0%
+                        tickformat=".1%" 
                     ), 
                     yaxis=dict(gridcolor="#FFFFFF")
                 )
