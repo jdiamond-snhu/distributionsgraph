@@ -3,11 +3,12 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 
 # Force the Streamlit page layout to use the full screen width
 st.set_page_config(layout="wide")
 
-# App Title & Subtitle (Flush left automatically)
+# App Title & Subtitle
 st.title("Stock Return Probability Distribution")
 st.write("Enter up to 4 stock tickers and press **Enter** to visualize their annual return distributions.")
 
@@ -53,10 +54,13 @@ if tickers:
                     st.warning(f"Not enough return data to plot {ticker}")
                     continue
 
-                # Calculate the exact mean return
+                # Calculate statistical parameters
                 mean_return = annual_returns.mean()
+                std_dev = annual_returns.std()
+                minus_1_sd = mean_return - std_dev
+                plus_1_sd = mean_return + std_dev
                 
-                # 1. Generate smooth frequency curve data natively without scipy
+                # Generate smooth frequency curve data natively without scipy
                 counts, bin_edges = np.histogram(annual_returns, bins=50, density=True)
                 bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
                 
@@ -69,7 +73,7 @@ if tickers:
                 # Smooth the data using a rolling average for an elegant curve shape
                 curve_df['Probability Density'] = curve_df['Probability Density'].rolling(window=3, center=True, min_periods=1).mean()
 
-                # 2. Draw an area chart to get a smooth line filled underneath
+                # Generate the base area chart
                 fig = px.area(
                     curve_df, 
                     x="Annual Return",
@@ -77,31 +81,52 @@ if tickers:
                     title=f"{ticker} Annual Return Distribution (5yr)",
                     labels={"Annual Return": "Annual Return (Log Scale)", "Probability Density": "Density"},
                     template="plotly_white",
-                    color_discrete_sequence=["#4A90E2"] # Nice clean blue border line
+                    color_discrete_sequence=["#4A90E2"] 
                 )
                 
-                # Make the line smooth (spline) and fill it with a soft, translucent light blue
+                # Make the line smooth (spline) and fill it with translucent light blue
                 fig.update_traces(
                     line_shape="spline",
                     line_width=2.5,
                     fill='tozeroy',
-                    fillcolor="rgba(173, 216, 230, 0.4)" # Translucent light blue hex/alpha format
+                    fillcolor="rgba(173, 216, 230, 0.4)" 
                 )
                 
-                # 3. Add a vertical black dotted line exactly at the mean return
-                fig.add_vline(
-                    x=mean_return, 
-                    line_dash="dot", 
-                    line_color="black",
-                    line_width=2,
-                    annotation_text=f"Mean: {mean_return:.2%}", 
-                    annotation_position="top right",
-                    annotation_font=dict(color="black", size=12)
+                # Helper function to find the closest Y (Density) coordinate on the curve for a given X value
+                def get_curve_y(x_val):
+                    idx = (curve_df['Annual Return'] - x_val).abs().idxmin()
+                    return curve_df.loc[idx, 'Probability Density']
+
+                # Find exact plot intersection coordinates
+                mean_y = get_curve_y(mean_return)
+                minus_sd_y = get_curve_y(minus_1_sd)
+                plus_sd_y = get_curve_y(plus_1_sd)
+
+                # Add a scatter trace layer for the 3 visual highlight dots
+                fig.add_trace(
+                    go.Scatter(
+                        x=[minus_1_sd, mean_return, plus_1_sd],
+                        y=[minus_sd_y, mean_y, plus_sd_y],
+                        mode="markers+text",
+                        marker=dict(color="#1F77B4", size=10, symbol="circle"), # Distinct blue dots
+                        text=[f"-1 SD: {minus_1_sd:.2%}", f"Mean: {mean_return:.2%}", f"+1 SD: {plus_1_sd:.2%}"],
+                        textposition=["top left", "top center", "top right"],
+                        textfont=dict(color="black", size=11),
+                        hoverinfo="skip"
+                    )
                 )
+                
+                # Draw vertical lines down to the X-axis
+                # Mean Line (Black Dotted)
+                fig.add_vline(x=mean_return, line_dash="dot", line_color="black", line_width=1.5)
+                # -1 SD Line (Gray Dotted)
+                fig.add_vline(x=minus_1_sd, line_dash="dot", line_color="gray", line_width=1)
+                # +1 SD Line (Gray Dotted)
+                fig.add_vline(x=plus_1_sd, line_dash="dot", line_color="gray", line_width=1)
                 
                 fig.update_layout(
                     showlegend=False,
-                    margin=dict(l=20, r=20, t=40, b=20) # Tighten margins for grid alignment
+                    margin=dict(l=20, r=20, t=40, b=20)
                 )
                 
                 plots.append(fig)
