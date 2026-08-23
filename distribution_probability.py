@@ -73,8 +73,8 @@ if tickers:
                 # Smooth the data using a rolling average for an elegant curve shape
                 curve_df['Probability Density'] = curve_df['Probability Density'].rolling(window=3, center=True, min_periods=1).mean()
 
-                # Generate the base area chart
-                fig = px.area(
+                # Generate the base line chart for the distribution
+                fig = px.line(
                     curve_df, 
                     x="Annual Return",
                     y="Probability Density",
@@ -84,14 +84,9 @@ if tickers:
                     color_discrete_sequence=["#4A90E2"] 
                 )
                 
-                # Make the line smooth (spline) and fill it with translucent light blue
-                fig.update_traces(
-                    line_shape="spline",
-                    line_width=2.5,
-                    fill='tozeroy',
-                    fillcolor="rgba(173, 216, 230, 0.4)" 
-                )
-                
+                # Make the outer line smooth (spline)
+                fig.update_traces(line_shape="spline", line_width=2.5)
+
                 # Helper function to find the closest Y (Density) coordinate on the curve for a given X value
                 def get_curve_y(x_val):
                     idx = (curve_df['Annual Return'] - x_val).abs().idxmin()
@@ -102,31 +97,50 @@ if tickers:
                 minus_sd_y = get_curve_y(minus_1_sd)
                 plus_sd_y = get_curve_y(plus_1_sd)
 
-                # Add a scatter trace layer for the 3 visual highlight dots
+                # Filter curve data points that fall strictly between -1 SD and +1 SD for shading
+                sd_zone_df = curve_df[(curve_df['Annual Return'] >= minus_1_sd) & (curve_df['Annual Return'] <= plus_1_sd)]
+
+                # 1. Fill the target Standard Deviation range with a deeper translucent blue shade
+                fig.add_trace(
+                    go.Scatter(
+                        x=sd_zone_df['Annual Return'],
+                        y=sd_zone_df['Probability Density'],
+                        fill='tozeroy',
+                        fillcolor="rgba(74, 144, 226, 0.4)", # Stronger translucent blue for the 1-SD zone
+                        mode='none',
+                        hoverinfo='skip',
+                        showlegend=False
+                    )
+                )
+
+                # 2. Add a scatter trace layer for the 3 visual highlight dots
                 fig.add_trace(
                     go.Scatter(
                         x=[minus_1_sd, mean_return, plus_1_sd],
                         y=[minus_sd_y, mean_y, plus_sd_y],
                         mode="markers+text",
-                        marker=dict(color="#1F77B4", size=10, symbol="circle"), # Distinct blue dots
+                        marker=dict(color="#1F77B4", size=10, symbol="circle"), 
                         text=[f"-1 SD: {minus_1_sd:.2%}", f"Mean: {mean_return:.2%}", f"+1 SD: {plus_1_sd:.2%}"],
                         textposition=["top left", "top center", "top right"],
                         textfont=dict(color="black", size=11),
-                        hoverinfo="skip"
+                        hoverinfo="skip",
+                        showlegend=False
                     )
                 )
                 
-                # Draw vertical lines down to the X-axis
-                # Mean Line (Black Dotted)
+                # Draw vertical drop lines down to the X-axis
                 fig.add_vline(x=mean_return, line_dash="dot", line_color="black", line_width=1.5)
-                # -1 SD Line (Gray Dotted)
                 fig.add_vline(x=minus_1_sd, line_dash="dot", line_color="gray", line_width=1)
-                # +1 SD Line (Gray Dotted)
                 fig.add_vline(x=plus_1_sd, line_dash="dot", line_color="gray", line_width=1)
                 
+                # 3. Apply light gray background styling to the graph plot and grid canvas
                 fig.update_layout(
                     showlegend=False,
-                    margin=dict(l=20, r=20, t=40, b=20)
+                    plot_bgcolor="#F4F4F6",  # Light gray interior graph background
+                    paper_bgcolor="#FFFFFF", # White background for the outer framing card
+                    margin=dict(l=20, r=20, t=40, b=20),
+                    xaxis=dict(gridcolor="#FFFFFF"), # Clean crisp white gridlines over the gray canvas
+                    yaxis=dict(gridcolor="#FFFFFF")
                 )
                 
                 plots.append(fig)
