@@ -4,12 +4,15 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 
-# App Title
+# Force the Streamlit page layout to use the full screen width
+st.set_page_config(layout="wide")
+
+# App Title & Subtitle (Flush left automatically)
 st.title("Stock Return Probability Distribution")
 st.write("Enter up to 4 stock tickers and press **Enter** to visualize their annual return distributions.")
 
 # User Input
-tickers_input = st.text_input("Enter Tickers (separated by commas)", "F, AAPL, MSFT")
+tickers_input = st.text_input("Enter Tickers (separated by commas)", "F, AAPL, MSFT, GOOG")
 tickers = [t.strip().upper() for t in tickers_input.split(',') if t.strip()]
 
 if len(tickers) > 4:
@@ -71,7 +74,7 @@ if tickers:
                     opacity=0.7
                 )
                 
-                # Highlight the calculated mean return as requested
+                # Highlight the calculated mean return
                 fig.add_vline(
                     x=mean_return, 
                     line_dash="dash", 
@@ -82,7 +85,8 @@ if tickers:
                 
                 fig.update_layout(
                     yaxis_title="Frequency Count",
-                    showlegend=False
+                    showlegend=False,
+                    margin=dict(l=20, r=20, t=40, b=20) # Tighten margins for grid alignment
                 )
                 
                 plots.append(fig)
@@ -90,9 +94,21 @@ if tickers:
             except Exception as e:
                 st.error(f"Error processing {ticker}: {e}")
 
-    # Render all successfully built plots sequentially
-    for plot in plots:
-        st.plotly_chart(plot, use_container_width=True)
+    # Render plots in a 2x2 grid structure
+    if plots:
+        # Create a loop that processes 2 elements at a time
+        for i in range(0, len(plots), 2):
+            # Create two equal-width columns for this row
+            col1, col2 = st.columns(2)
+            
+            # Place the first plot in the left column
+            with col1:
+                st.plotly_chart(plots[i], use_container_width=True)
+                
+            # Place the second plot in the right column if it exists
+            if i + 1 < len(plots):
+                with col2:
+                    st.plotly_chart(plots[i+1], use_container_width=True)
 
 st.sidebar.header("About")
 st.sidebar.info("This application tracks historical metrics and shifts directly on text submission.")
